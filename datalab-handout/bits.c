@@ -166,7 +166,7 @@ int tmin(void) {
  */
 int isTmax(int x) {
   int plus_one = x + 1;
-  return (!(plus_one ^ (~x))) & (!!(plus_one ^ 0x0));
+  return (!(plus_one ^ (~x))) & !!plus_one;
 }
 /* 
  * allOddBits - return 1 if all odd-numbered bits in word set to 1
@@ -259,6 +259,46 @@ int logicalNeg(int x) {
  *  Rating: 4
  */
 int howManyBits(int x) {
+  int res = 1;
+  int tmp;
+  int flag;
+
+  /* signal of x*/
+  int s = (x >> 31) + 1;
+  flag = ((!!s) << 31) >> 31;
+  /* if x < 0, x = ~x, otherwise x = x */
+  x = (x & flag) ^ ((~x) & (~flag));
+
+  /* check if high 16 bits of x has 1 */
+  tmp = x >> 16;
+  flag = ((!!tmp) << 31) >> 31;
+  /* if has, res += 16, and then recursivly check high 8 bits of high 16 bits
+     otherwise recursivly check high 8 bits of low 16 bits */
+  res += (16 & flag);
+  x = (tmp & flag) ^ (x & (~flag));
+
+  tmp = x >> 8;
+  flag = ((!!tmp) << 31) >> 31;
+  res += (8 & flag);
+  x = (tmp & flag) ^ (x & (~flag));
+
+  tmp = x >> 4;
+  flag = ((!!tmp) << 31) >> 31;
+  res += (4 & flag);
+  x = (tmp & flag) ^ (x & (~flag));
+
+  tmp = x >> 2;
+  flag = ((!!tmp) << 31) >> 31;
+  res += (2 & flag);
+  x = (tmp & flag) ^ (x & (~flag));
+
+  tmp = x >> 1;
+  flag = ((!!tmp) << 31) >> 31;
+  res += (1 & flag);
+  x = (tmp & flag) ^ (x & (~flag));
+
+  /* do not forget the last 1 bit */
+  return res + x;
 }
 //float
 /* 
@@ -273,7 +313,41 @@ int howManyBits(int x) {
  *   Rating: 4
  */
 unsigned floatScale2(unsigned uf) {
-  return 2;
+  /* get s of float point */
+  unsigned s = uf & 0x80000000;
+  /* get e of float point */
+  unsigned e = uf & 0x7F800000;
+  /* get M of float point */
+  unsigned M = uf & 0x7FFFFF;
+
+  /* M * 2 */
+  unsigned M_mutiple_2;
+  /* carry of (M * 2) in bit 24 */
+  unsigned carry;
+  /* NaN, +inf and -inf */
+  if (e == 0x7F800000) return uf;
+  /* if uf is formal number, we only need to let e++ */
+  if (e != 0x0) {
+    e += 0x00800000;
+    /* clear old e and set new e to uf */
+    return (uf & 0x807FFFFF) | e;
+  }
+
+  /* if us is unformal number, we need to let M * 2, and see if there is carry. */
+  M_mutiple_2 = M * 2;
+  carry = (M_mutiple_2 >> 23) & 0x1;
+  /* 1. if there has not carry, we just return M * 2, 
+        and notice that do not forget the sign */
+  if (carry == 0)
+    /* use "s | " to set sign */
+    return s | M_mutiple_2;
+  /* 2. if there has carry, we need to set e to 0x1, 
+        and set bit-24 of M_mutiple_2 to 0 */
+  M_mutiple_2 = M_mutiple_2 & 0x007FFFFF;
+  /* s use to set sign, 
+     Mutiple_2 use to set M, 
+     0x00800000 use to set e to 1*/
+  return s | M_mutiple_2 | 0x00800000;
 }
 /* 
  * floatFloat2Int - Return bit-level equivalent of expression (int) f
@@ -288,7 +362,44 @@ unsigned floatScale2(unsigned uf) {
  *   Rating: 4
  */
 int floatFloat2Int(unsigned uf) {
-  return 2;
+  /* get s of float point */
+  // printf("123\t");
+  unsigned s = uf >> 31;
+  /* get e of float point */
+  unsigned e = uf & 0x7F800000;
+  // /* bit number of e */
+  // unsigned k = 8;
+  // /* bias using to compute E */
+  // unsigned bias = (0x1 << (k - 1)) - 1;
+  unsigned bias = 0x7F;
+  /* real exp */
+  int E = (e >> 23) - bias;
+  /* get frac of float point */
+  unsigned frac = uf & 0x7FFFFF;
+
+  int res = 1;
+  int i, old;
+
+  int last = E - 23;
+
+  /* NaN and infinity */
+  if (e == 0x7F800000) return 0x80000000u;
+  /* unformal number x, |x| < 1, so return 0, and formalnumber but less than 0 also return 0  */
+  if (e == 0x0 || E < 0) return 0;
+
+
+  for (i = 1; i <= 23 && i <= E; i++) {
+    res *= 2;
+    if ((frac >> (24 - i)) == 1) 
+      res++;
+  }
+  while (last > 0) {
+    old = res;
+    res *= 2;
+    if (res < old) return 0x80000000u;
+    last--;
+  }
+  return s == 1 ? -res : res;
 }
 /* 
  * floatPower2 - Return bit-level equivalent of the expression 2.0^x
@@ -304,5 +415,11 @@ int floatFloat2Int(unsigned uf) {
  *   Rating: 4
  */
 unsigned floatPower2(int x) {
-    return 2;
+  /* result < denorm */
+  if (x < -149) return 0;
+  /* result is denorm */
+  if (x < -126) return 150 + x;
+  /* result is too large */
+  if (x > 127) return 0x7F800000;
+  return (x + 0x7F) << 23;
 }
