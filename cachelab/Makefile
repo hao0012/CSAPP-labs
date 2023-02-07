@@ -6,6 +6,8 @@ CC = gcc
 CFLAGS = -g -Wall -Werror -std=c99 -m64
 OBJECTS = csim.c cachelab.c cachelab.h cache.c cache.h
 
+all: csim test-trans tracegen
+
 csim: $(OBJECTS)
 	$(CC) $(CFLAGS) -o csim $(OBJECTS) -lm
 
