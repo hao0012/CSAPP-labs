@@ -35,6 +35,17 @@ team_t team = {
     ""
 };
 
+#define WSIZE 4
+#define DWSIZE (WSIZE * 2)
+
+#define CHUNK_SIZE (1 << 12)
+
+#define GET(p) (*(unsigned int *) (p))
+//* *p = v
+#define PUT(p, v) (*(unsigned int *)(p) = (v))
+
+#define PACK(size, is_allocated) ((size) | (is_allocated))
+
 /* single word (4) or double word (8) alignment */
 #define ALIGNMENT 8
 
@@ -44,12 +55,38 @@ team_t team = {
 
 #define SIZE_T_SIZE (ALIGN(sizeof(size_t)))
 
+static void *heap_list;
+
 /* 
  * mm_init - initialize the malloc package.
  */
 int mm_init(void)
 {
+    // allocate 4 word size memory for start block(1), prologue block(2) and end block(1)
+    if ((heap_list = mem_sbrk(WSIZE * 4)) == -1) {
+        return -1;
+    }
+
+    // void *start here is 0x0
+    // set start block
+    PUT(heap_list, 0);
+    // set prologue block
+    PUT(heap_list + WSIZE, PACK(DWSIZE, 1));
+    PUT(heap_list + 2 * WSIZE, PACK(DWSIZE, 1));
+    // set end block
+    PUT(heap_list + 3 * WSIZE, PACK(0, 1));
+
+    heap_list += (2 * WSIZE);
+
+    // create a CHUNK_SIZE block
+    extend_heap(CHUNK_SIZE / WSIZE);
+
     return 0;
+}
+
+int extend_heap(int size) {
+    void *old_top;
+    if ((old_top = mem_sbrk()))
 }
 
 /* 

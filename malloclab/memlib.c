@@ -57,14 +57,18 @@ void mem_reset_brk()
  */
 void *mem_sbrk(int incr) 
 {
+    // record the old top
     char *old_brk = mem_brk;
 
+    // if incr illegal or out of range, return error
     if ( (incr < 0) || ((mem_brk + incr) > mem_max_addr)) {
 	errno = ENOMEM;
 	fprintf(stderr, "ERROR: mem_sbrk failed. Ran out of memory...\n");
 	return (void *)-1;
     }
+    // increment
     mem_brk += incr;
+    // return old top
     return (void *)old_brk;
 }
 
